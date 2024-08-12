@@ -24,6 +24,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	r.POST("/auth/login", s.loginHandler)
 
+	r.POST("/chat", s.CreateChatHandler)
+
 	return r
 }
 
@@ -65,6 +67,12 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	})
 }
 
+type WrongPasswordErr struct{}
+
+func (err WrongPasswordErr) Error() string {
+	return "passwords don't match"
+}
+
 func (s *Server) loginHandler(c *gin.Context) {
 	user := database.User{}
 	body, _ := c.GetRawData()
@@ -82,9 +90,13 @@ func (s *Server) loginHandler(c *gin.Context) {
 
 	user.Password = base64.URLEncoding.EncodeToString(password)
 
-	user, err = s.db.ValidatePassword(user)
+	userDb, err := s.db.GetUser(user.Email)
 
-	if errors.Is(err, database.WrongPasswordErr{}) || errors.Is(err, mongo.ErrNoDocuments) {
+	if err == nil && user.Password != userDb.Password {
+		err = WrongPasswordErr{}
+	}
+
+	if errors.Is(err, WrongPasswordErr{}) || errors.Is(err, mongo.ErrNoDocuments) {
 		c.JSON(http.StatusUnauthorized, gin.H{"message:": "Wrong email or password"})
 		return
 	}
@@ -95,6 +107,46 @@ func (s *Server) loginHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"jwt": authToken.CreateToken(user),
+		"jwt": authToken.CreateToken(userDb),
 	})
 }
+
+type createChatPayload struct {
+	Jwt        string `json:"jwt"`
+	CreatorUid string `json:"creatorUid"`
+	TargetUid  string `json:"targetUid"`
+}
+
+func (s *Server) CreateChatHandler(c *gin.Context) {
+	payload := createChatPayload{}
+	body, _ := c.GetRawData()
+
+	err := json.Unmarshal(body, &payload)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
+		return
+	}
+
+	err = authToken.VerifyToken(payload.Jwt)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+		return
+	}
+
+	chatroom, err := s.db.CreateChat(payload.CreatorUid, payload.TargetUid)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"chatroomID": chatroom.ChatId})
+}
+
+// var upgrader = ws.Upgrader{
+// 	ReadBufferSize:  1024,
+// 	WriteBufferSize: 1024,
+// 	CheckOrigin:     func(r *http.Request) bool { return true },
+// }
