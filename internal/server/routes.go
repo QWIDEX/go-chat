@@ -1,18 +1,20 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"go-chat/internal/database"
 	authToken "go-chat/internal/jwt"
 
-	"go.mongodb.org/mongo-driver/mongo"
-
 	"github.com/gin-gonic/gin"
+	ws "github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -24,7 +26,9 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	r.POST("/auth/login", s.loginHandler)
 
-	r.POST("/chat", s.CreateChatHandler)
+	r.POST("/chat", s.createChatHandler)
+
+	r.GET("/chat", s.connectToChatHandler)
 
 	return r
 }
@@ -117,7 +121,7 @@ type createChatPayload struct {
 	TargetUid  string `json:"targetUid"`
 }
 
-func (s *Server) CreateChatHandler(c *gin.Context) {
+func (s *Server) createChatHandler(c *gin.Context) {
 	payload := createChatPayload{}
 	body, _ := c.GetRawData()
 
@@ -145,8 +149,124 @@ func (s *Server) CreateChatHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"chatroomID": chatroom.ChatId})
 }
 
-// var upgrader = ws.Upgrader{
-// 	ReadBufferSize:  1024,
-// 	WriteBufferSize: 1024,
-// 	CheckOrigin:     func(r *http.Request) bool { return true },
-// }
+var upgrader = ws.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin:     func(r *http.Request) bool { return true },
+}
+
+type wsError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type chatPayload struct {
+	Jwt    string `json:"jwt"`
+	ChatId string `json:"chatId"`
+}
+
+func findVal(data map[string]interface{}, val string) string {
+	if updateDescription, ok := data["updateDescription"].(map[string]interface{}); ok {
+		if updatedFields, ok := updateDescription["updatedFields"].(map[string]interface{}); ok {
+			for _, v := range updatedFields {
+				if field, ok := v.(map[string]interface{}); ok {
+					if value, ok := field[val].(string); ok {
+						return value
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func awaitForMsg(chatId string, uid string, conn *ws.Conn, s *Server, closed <-chan bool) {
+	stream, _ := s.db.WatchChat(chatId)
+	defer stream.Close(context.TODO())
+
+	for {
+		select {
+		case <-closed:
+			return
+		default:
+			var changeEvent map[string]interface{}
+			stream.Next(context.TODO())
+			curr := stream.Current
+			stream.Decode(&changeEvent)
+
+			json.Unmarshal([]byte(curr.String()), &changeEvent)
+
+			message := findVal(changeEvent, "message")
+			sender := findVal(changeEvent, "sender")
+
+			if sender != uid {
+				conn.WriteJSON(database.Message{Message: message, Sender: sender})
+			}
+		}
+	}
+
+}
+
+func (s *Server) connectToChatHandler(c *gin.Context) {
+	writer := c.Writer
+	request := c.Request
+	conn, err := upgrader.Upgrade(writer, request, nil)
+
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	chatData := chatPayload{}
+	conn.ReadJSON(&chatData)
+
+	err = authToken.VerifyToken(chatData.Jwt)
+
+	if err != nil {
+		conn.WriteJSON(wsError{Code: http.StatusUnauthorized, Message: "bad user data"})
+	}
+
+	user, _ := authToken.GetUserData(chatData.Jwt)
+
+	userFromDb, _ := s.db.GetUser(user.Email)
+	hasAcces := false
+	for _, id := range userFromDb.Chatrooms {
+		if chatData.ChatId == id {
+			hasAcces = true
+		}
+	}
+
+	if !hasAcces {
+		conn.WriteJSON(wsError{Code: http.StatusForbidden, Message: "you are not able to acces this chat"})
+		return
+	}
+
+	history, err := s.db.GetChatHistory(chatData.ChatId)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	conn.WriteJSON(gin.H{"history": history})
+
+	closed := make(chan bool)
+
+	defer func() { closed <- true }()
+	go awaitForMsg(chatData.ChatId, user.Uid, conn, s, closed)
+
+	for {
+		message := database.Message{}
+		err := conn.ReadJSON(&message)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		err = s.db.SendMessage(chatData.ChatId, message)
+
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+}

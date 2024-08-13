@@ -19,6 +19,9 @@ type Service interface {
 	UserExists(email string) bool
 	CreateChat(creatorUid, targetUid string) (Chatroom, error)
 	AddUserChatroom(uidUser, uidChatroom string) error
+	WatchChat(chatId string) (*mongo.ChangeStream, error)
+	SendMessage(chatId string, message Message) error
+	GetChatHistory(chatId string) ([]Message, error)
 }
 
 type service struct {

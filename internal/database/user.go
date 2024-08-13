@@ -44,17 +44,6 @@ func (u *user) toPublicUser() User {
 	return user
 }
 
-// func (u *User) toPrivateUser() user {
-// 	user := user{}
-
-// 	user.Email = u.Email
-// 	user.Password = u.Password
-// 	user.Username = u.Username
-// 	user.DbId, _ = primitive.ObjectIDFromHex(u.Uid)
-
-// 	return user
-// }
-
 func (s *service) AddUser(user User) (User, error) {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Users")
