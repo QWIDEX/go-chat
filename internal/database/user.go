@@ -2,20 +2,19 @@ package database
 
 import (
 	"context"
-	"errors"
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
 	Uri = os.Getenv("mongoURI")
 )
 
+// public user struct how our app sees user
 type User struct {
 	Email     string   `json:"email"`
 	Password  string   `json:"password"`
@@ -24,6 +23,7 @@ type User struct {
 	Uid       string   `json:"uid"`
 }
 
+// how our db sees user
 type user struct {
 	Email     string
 	Password  string
@@ -32,6 +32,7 @@ type user struct {
 	DbId      primitive.ObjectID `bson:"_id"`
 }
 
+// convering function
 func (u *user) toPublicUser() User {
 	user := User{}
 
@@ -91,21 +92,6 @@ func (s *service) GetUser(email string) (User, error) {
 	}
 
 	return User{}, res.Err()
-}
-
-func (s *service) UserExists(email string) bool {
-	db := s.db.Database("ChatApp")
-	coll := db.Collection("Users")
-
-	if res := coll.FindOne(context.TODO(), bson.D{
-		primitive.E{
-			Key: "email", Value: email,
-		},
-	}); errors.Is(res.Err(), mongo.ErrNoDocuments) {
-		return false
-	}
-
-	return true
 }
 
 func (s *service) AddUserChatroom(uidUser, uidChatroom string) error {

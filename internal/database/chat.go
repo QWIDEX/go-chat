@@ -5,7 +5,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Message struct {
@@ -19,15 +18,14 @@ type Chatroom struct {
 	ChatId  string
 }
 
-func (s *service) CreateChat(creatorUid, targetUid string) (Chatroom, error) {
+func (s *service) CreateChatroom(creatorUid, targetUid string) (Chatroom, error) {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Chats")
 
 	chatroom := Chatroom{}
 
 	res, err := coll.InsertOne(context.TODO(), map[string]any{
-		"creator": creatorUid,
-		"target":  targetUid,
+		"members": []string{creatorUid, targetUid},
 		"chat":    []Message{},
 	})
 
@@ -39,43 +37,7 @@ func (s *service) CreateChat(creatorUid, targetUid string) (Chatroom, error) {
 
 	chatroom.ChatId = id.Hex()
 
-	err = s.AddUserChatroom(creatorUid, chatroom.ChatId)
-
-	if err != nil {
-		return Chatroom{}, err
-	}
-
-	err = s.AddUserChatroom(targetUid, chatroom.ChatId)
-
-	if err != nil {
-		return Chatroom{}, err
-	}
-
-	chatroom.Members = append(chatroom.Members, creatorUid, targetUid)
-
 	return chatroom, nil
-}
-
-func (s *service) WatchChat(chatId string) (*mongo.ChangeStream, error) {
-	db := s.db.Database("ChatApp")
-	coll := db.Collection("Chats")
-
-	id, _ := primitive.ObjectIDFromHex(chatId)
-
-	stream, err := coll.Watch(context.TODO(), mongo.Pipeline{
-		{{"$match", bson.D{
-			{"documentKey._id", id},
-			{"operationType", "update"},
-		}}},
-		bson.D{{"$project", bson.D{{"updateDescription.updatedFields", true}}}},
-	},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return stream, nil
 }
 
 func (s *service) SendMessage(chatId string, message Message) error {
@@ -90,7 +52,7 @@ func (s *service) SendMessage(chatId string, message Message) error {
 	return err
 }
 
-func (s *service) GetChatHistory(chatId string) ([]Message, error) {
+func (s *service) GetChat(chatId string) (Chatroom, error) {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Chats")
 
@@ -106,8 +68,8 @@ func (s *service) GetChatHistory(chatId string) ([]Message, error) {
 	err := res.Decode(&chatroom)
 
 	if err != nil {
-		return []Message{}, err
+		return Chatroom{}, err
 	}
 
-	return chatroom.Chat, nil
+	return chatroom, nil
 }

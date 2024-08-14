@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/websocket"
 	_ "github.com/joho/godotenv/autoload"
 
 	"go-chat/internal/database"
@@ -15,7 +16,8 @@ import (
 type Server struct {
 	port int
 
-	db database.Service
+	db            database.Service
+	wsConnoctions map[string]*websocket.Conn
 }
 
 func NewServer() *http.Server {
@@ -23,7 +25,8 @@ func NewServer() *http.Server {
 	NewServer := &Server{
 		port: port,
 
-		db: database.New(),
+		wsConnoctions: make(map[string]*websocket.Conn),
+		db:            database.New(),
 	}
 
 	// Declare Server config

@@ -16,12 +16,10 @@ type Service interface {
 	Health() map[string]string
 	AddUser(user User) (User, error)
 	GetUser(email string) (User, error)
-	UserExists(email string) bool
-	CreateChat(creatorUid, targetUid string) (Chatroom, error)
 	AddUserChatroom(uidUser, uidChatroom string) error
-	WatchChat(chatId string) (*mongo.ChangeStream, error)
+	CreateChatroom(creatorUid, targetUid string) (Chatroom, error)
 	SendMessage(chatId string, message Message) error
-	GetChatHistory(chatId string) ([]Message, error)
+	GetChat(chatId string) (Chatroom, error)
 }
 
 type service struct {
