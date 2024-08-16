@@ -67,6 +67,7 @@ func (s *Server) createChatHandler(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
 		return
 	}
 
@@ -113,7 +114,7 @@ func (s *Server) connectToChatHandler(c *gin.Context) {
 	err = authToken.VerifyToken(chatData.Jwt)
 
 	if err != nil {
-		conn.WriteJSON(wsError{Code: http.StatusUnauthorized, Message: "bad user data"})
+		conn.WriteJSON(wsError{Code: http.StatusUnauthorized, Message: "token not valid"})
 	}
 	// getting basic user data
 	user, _ := authToken.GetUserData(chatData.Jwt)
@@ -173,4 +174,91 @@ func (s *Server) connectToChatHandler(c *gin.Context) {
 			fmt.Println(err)
 		}
 	}
+}
+
+type addChatroomMemberPayload struct {
+	Jwt       string `json:"jwt"`
+	ChatId    string `json:"chatId"`
+	MemberUid string `json:"memberUid"`
+}
+
+func (s *Server) addChatroomMemberHandler(c *gin.Context) {
+	payload := addChatroomMemberPayload{}
+	body, _ := c.GetRawData()
+
+	err := json.Unmarshal(body, &payload)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
+		return
+	}
+
+	// verifying jwt
+
+	err = authToken.VerifyToken(payload.Jwt)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "bad user data"})
+		return
+	}
+
+	// getting data
+
+	userData, _ := authToken.GetUserData(payload.Jwt)
+
+	chat, err := s.db.GetChat(payload.ChatId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
+		return
+	}
+
+	// checking if user has acces to chatroom
+	hasAcces := false
+	for _, id := range chat.Members {
+		if userData.Uid == id {
+			hasAcces = true
+		}
+	}
+
+	if !hasAcces {
+		c.JSON(http.StatusForbidden, gin.H{"message": "you are not able to acces this chat"})
+		return
+	}
+
+	isAlreadyInChatroom := false
+
+	for _, id := range chat.Members {
+		if payload.MemberUid == id {
+			isAlreadyInChatroom = true
+		}
+	}
+
+	if isAlreadyInChatroom {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "member is already in chatroom"})
+		return
+	}
+
+	// adding user to chatroom
+
+	err = s.db.AddChatroomMember(payload.MemberUid, payload.ChatId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
+		return
+	}
+
+	err = s.db.AddUserChatroom(payload.MemberUid, payload.ChatId)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
+		return
+	}
+
+	chat.Members = append(chat.Members, payload.MemberUid)
+
+	c.JSON(http.StatusOK, gin.H{"members": chat.Members})
 }

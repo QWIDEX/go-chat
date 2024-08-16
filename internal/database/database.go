@@ -18,6 +18,7 @@ type Service interface {
 	GetUser(email string) (User, error)
 	AddUserChatroom(uidUser, uidChatroom string) error
 	CreateChatroom(creatorUid, targetUid string) (Chatroom, error)
+	AddChatroomMember(uid, chatid string) error
 	SendMessage(chatId string, message Message) error
 	GetChat(chatId string) (Chatroom, error)
 }

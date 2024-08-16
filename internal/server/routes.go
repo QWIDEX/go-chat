@@ -11,11 +11,15 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	r.GET("/health", s.healthHandler)
 
-	r.POST("/auth", s.createUserHandler)
+	r.POST("/auth/register", s.createUserHandler)
 
 	r.POST("/auth/login", s.loginHandler)
 
+	r.GET("/user", s.getUserData)
+
 	r.POST("/chat", s.createChatHandler)
+
+	r.PATCH("/chat", s.addChatroomMemberHandler)
 
 	r.GET("/chat", s.connectToChatHandler)
 

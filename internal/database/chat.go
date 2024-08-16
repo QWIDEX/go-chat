@@ -40,6 +40,18 @@ func (s *service) CreateChatroom(creatorUid, targetUid string) (Chatroom, error)
 	return chatroom, nil
 }
 
+func (s *service) AddChatroomMember(uid, chatid string) error {
+	db := s.db.Database("ChatApp")
+	coll := db.Collection("Chats")
+
+	id, _ := primitive.ObjectIDFromHex(chatid)
+
+	update := bson.D{{"$push", bson.D{{"members", uid}}}}
+	_, err := coll.UpdateByID(context.TODO(), id, update)
+
+	return err
+}
+
 func (s *service) SendMessage(chatId string, message Message) error {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Chats")

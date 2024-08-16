@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"go-chat/internal/database"
@@ -45,12 +46,19 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	user, err = s.db.AddUser(user)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong while adding user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"jwt": authToken.CreateToken(user),
+		"user": gin.H{
+			"Username":  user.Username,
+			"uid":       user.Uid,
+			"email":     user.Email,
+			"chatrooms": user.Chatrooms,
+		},
 	})
 }
 
@@ -93,10 +101,63 @@ func (s *Server) loginHandler(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"jwt": authToken.CreateToken(userDb),
+		"user": gin.H{
+			"Username":  userDb.Username,
+			"uid":       userDb.Uid,
+			"email":     userDb.Email,
+			"chatrooms": userDb.Chatrooms,
+		},
+	})
+}
+
+type getUserDataPayload struct {
+	Jwt string `json:"jwt"`
+}
+
+func (s *Server) getUserData(c *gin.Context) {
+	jwtStruct := getUserDataPayload{}
+	body, _ := c.GetRawData()
+
+	err := json.Unmarshal(body, &jwtStruct)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
+		return
+	}
+
+	if err = authToken.VerifyToken(jwtStruct.Jwt); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "token not valid"})
+		return
+	}
+
+	tokenData, err := authToken.GetUserData(jwtStruct.Jwt)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
+		return
+	}
+
+	userData, err := s.db.GetUser(tokenData.Email)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		fmt.Println(err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"Username":  userData.Username,
+			"uid":       userData.Uid,
+			"email":     userData.Email,
+			"chatrooms": userData.Chatrooms,
+		},
 	})
 }
