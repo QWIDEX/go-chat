@@ -1,0 +1,6 @@
+tmp/
+.vscode
+README.md
+Makefile
+.gitignore
+.env.default

@@ -2,16 +2,11 @@ package database
 
 import (
 	"context"
-	"os"
 
 	_ "github.com/joho/godotenv/autoload"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-)
-
-var (
-	Uri = os.Getenv("mongoURI")
 )
 
 // public user struct how our app sees user
