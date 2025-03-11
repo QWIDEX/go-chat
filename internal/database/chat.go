@@ -46,7 +46,7 @@ func (s *service) AddChatroomMember(uid, chatid string) error {
 
 	id, _ := primitive.ObjectIDFromHex(chatid)
 
-	update := bson.D{{"$push", bson.D{{"members", uid}}}}
+	update := bson.D{{Key: "$push", Value: bson.D{{Key: "members", Value: uid}}}}
 	_, err := coll.UpdateByID(context.TODO(), id, update)
 
 	return err
@@ -58,7 +58,7 @@ func (s *service) SendMessage(chatId string, message Message) error {
 
 	id, _ := primitive.ObjectIDFromHex(chatId)
 
-	update := bson.D{{"$push", bson.D{{"chat", message}}}}
+	update := bson.D{{Key: "$push", Value: bson.D{{Key: "chat", Value: message}}}}
 	_, err := coll.UpdateByID(context.TODO(), id, update)
 
 	return err

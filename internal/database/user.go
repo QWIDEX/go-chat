@@ -95,7 +95,7 @@ func (s *service) AddUserChatroom(uidUser, uidChatroom string) error {
 
 	id, _ := primitive.ObjectIDFromHex(uidUser)
 
-	update := bson.D{{"$push", bson.D{{"chatrooms", uidChatroom}}}}
+	update := bson.D{{Key: "$push", Value: bson.D{{Key: "chatrooms", Value: uidChatroom}}}}
 	_, err := coll.UpdateByID(context.TODO(), id, update)
 
 	return err

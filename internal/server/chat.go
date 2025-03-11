@@ -89,11 +89,11 @@ type wsError struct {
 
 // payload that is expected to be user's first message
 type chatPayload struct {
-	Jwt    string `json:"jwt"`
-	ChatId string `json:"chatId"`
+	Jwt string `json:"jwt"`
 }
 
 func (s *Server) connectToChatHandler(c *gin.Context) {
+	chatId := c.Param("chatId")
 	// creating websocket connection
 	writer := c.Writer
 	request := c.Request
@@ -126,7 +126,7 @@ func (s *Server) connectToChatHandler(c *gin.Context) {
 
 	// getting chatroom data
 
-	chat, err := s.db.GetChat(chatData.ChatId)
+	chat, err := s.db.GetChat(chatId)
 
 	// checking if user has acces to chatroom
 	hasAcces := false
@@ -157,7 +157,7 @@ func (s *Server) connectToChatHandler(c *gin.Context) {
 			return
 		}
 		// sending message to a db
-		err = s.db.SendMessage(chatData.ChatId, message)
+		err = s.db.SendMessage(chatId, message)
 		// sending message to other websocket clients that have acces to this chat
 		if err == nil {
 			for _, uid := range chat.Members {
@@ -166,12 +166,15 @@ func (s *Server) connectToChatHandler(c *gin.Context) {
 					if ok {
 						otherConn.WriteJSON(message)
 					}
+				} else {
+					conn.WriteJSON(database.Message{Sender: "server", Message: "delivered"})
 				}
 			}
 		}
 
 		if err != nil {
 			fmt.Println(err)
+			conn.WriteJSON(database.Message{Sender: "server", Message: "Internal server error"})
 		}
 	}
 }

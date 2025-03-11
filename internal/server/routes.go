@@ -15,13 +15,13 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	r.POST("/auth/login", s.loginHandler)
 
-	r.GET("/user", s.getUserData)
+	r.GET("/auth", s.getUserData)
 
 	r.POST("/chat", s.createChatHandler)
 
 	r.PATCH("/chat", s.addChatroomMemberHandler)
 
-	r.GET("/chat", s.connectToChatHandler)
+	r.GET("/chat/:chatId", s.connectToChatHandler)
 
 	return r
 }
