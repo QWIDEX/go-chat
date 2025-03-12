@@ -6,17 +6,14 @@ import (
 	"net/http"
 
 	"go-chat/internal/database"
-	authToken "go-chat/internal/jwt"
+	"go-chat/internal/helpers"
 
 	"github.com/gin-gonic/gin"
-	ws "github.com/gorilla/websocket"
 )
 
 // payload that is expected to create chat
 type createChatPayload struct {
-	Jwt        string `json:"jwt"`
-	CreatorUid string `json:"creatorUid"`
-	TargetUid  string `json:"targetUid"`
+	TargetUid string `json:"targetUid"`
 }
 
 func (s *Server) createChat(creatorUid, targetUid string) (database.Chatroom, error) {
@@ -45,6 +42,11 @@ func (s *Server) createChat(creatorUid, targetUid string) (database.Chatroom, er
 }
 
 func (s *Server) createChatHandler(c *gin.Context) {
+	_, user, ok := helpers.AuthHelper(c)
+
+	if !ok {
+		return
+	}
 	// getting payload
 	payload := createChatPayload{}
 	body, _ := c.GetRawData()
@@ -55,15 +57,9 @@ func (s *Server) createChatHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
 		return
 	}
-	// verifying token
-	err = authToken.VerifyToken(payload.Jwt)
 
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
-		return
-	}
 	// creating chatroom
-	chatroom, err := s.createChat(payload.CreatorUid, payload.TargetUid)
+	chatroom, err := s.createChat(user.Uid, payload.TargetUid)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
@@ -74,118 +70,67 @@ func (s *Server) createChatHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"chatroomID": chatroom.ChatId})
 }
 
-// webocket upgrader config
-var upgrader = ws.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+type getChatHistoryPayload struct {
+	From   int `json:"from"`
+	Length int `json:"length"`
 }
 
-// type of error that will be sent through websocket
-type wsError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
+func (s *Server) getChatHistory(c *gin.Context) {
+	_, user, ok := helpers.AuthHelper(c)
 
-// payload that is expected to be user's first message
-type chatPayload struct {
-	Jwt string `json:"jwt"`
-}
+	if !ok {
+		return
+	}
 
-func (s *Server) connectToChatHandler(c *gin.Context) {
 	chatId := c.Param("chatId")
-	// creating websocket connection
-	writer := c.Writer
-	request := c.Request
-	conn, err := upgrader.Upgrade(writer, request, nil)
+
+	payload := getChatHistoryPayload{}
+	body, _ := c.GetRawData()
+
+	err := json.Unmarshal(body, &payload)
 
 	if err != nil {
-		return
-	}
-	defer conn.Close()
-
-	//getting data
-
-	// getting payload
-	chatData := chatPayload{}
-	conn.ReadJSON(&chatData)
-
-	// verifying token
-	err = authToken.VerifyToken(chatData.Jwt)
-
-	if err != nil {
-		conn.WriteJSON(wsError{Code: http.StatusUnauthorized, Message: "token not valid"})
-	}
-	// getting basic user data
-	user, _ := authToken.GetUserData(chatData.Jwt)
-
-	// adding connection to a list of server websocket connections
-
-	s.wsConnoctions[user.Uid] = conn
-	defer delete(s.wsConnoctions, user.Uid)
-
-	// getting chatroom data
-
-	chat, err := s.db.GetChat(chatId)
-
-	// checking if user has acces to chatroom
-	hasAcces := false
-	for _, id := range chat.Members {
-		if user.Uid == id {
-			hasAcces = true
-		}
-	}
-
-	if !hasAcces {
-		conn.WriteJSON(wsError{Code: http.StatusForbidden, Message: "you are not able to acces this chat"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
 		return
 	}
 
+	chatroom, err := s.db.GetChat(chatId, payload.From, payload.Length)
+
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 		fmt.Println(err)
+		return
 	}
-	// senfing chatroom history to user
-	conn.WriteJSON(gin.H{"history": chat.Chat})
 
-	for {
-		// awaiting for message
-		message := database.Message{}
-		err := conn.ReadJSON(&message)
+	isMember := false
 
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		// sending message to a db
-		err = s.db.SendMessage(chatId, message)
-		// sending message to other websocket clients that have acces to this chat
-		if err == nil {
-			for _, uid := range chat.Members {
-				if uid != user.Uid {
-					otherConn, ok := s.wsConnoctions[uid]
-					if ok {
-						otherConn.WriteJSON(message)
-					}
-				} else {
-					conn.WriteJSON(database.Message{Sender: "server", Message: "delivered"})
-				}
-			}
-		}
-
-		if err != nil {
-			fmt.Println(err)
-			conn.WriteJSON(database.Message{Sender: "server", Message: "Internal server error"})
+	for _, userId := range chatroom.Members {
+		if userId == user.Uid {
+			isMember = true
 		}
 	}
+
+	if !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"message": "you are not able to acces this chat"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"chatroom": chatroom})
+
 }
 
 type addChatroomMemberPayload struct {
-	Jwt       string `json:"jwt"`
 	ChatId    string `json:"chatId"`
 	MemberUid string `json:"memberUid"`
 }
 
 func (s *Server) addChatroomMemberHandler(c *gin.Context) {
+	_, user, ok := helpers.AuthHelper(c)
+
+	if !ok {
+		return
+	}
+
 	payload := addChatroomMemberPayload{}
 	body, _ := c.GetRawData()
 
@@ -196,20 +141,7 @@ func (s *Server) addChatroomMemberHandler(c *gin.Context) {
 		return
 	}
 
-	// verifying jwt
-
-	err = authToken.VerifyToken(payload.Jwt)
-
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "bad user data"})
-		return
-	}
-
-	// getting data
-
-	userData, _ := authToken.GetUserData(payload.Jwt)
-
-	chat, err := s.db.GetChat(payload.ChatId)
+	chat, err := s.db.GetChat(payload.ChatId, 0, 0)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
@@ -220,7 +152,7 @@ func (s *Server) addChatroomMemberHandler(c *gin.Context) {
 	// checking if user has acces to chatroom
 	hasAcces := false
 	for _, id := range chat.Members {
-		if userData.Uid == id {
+		if user.Uid == id {
 			hasAcces = true
 		}
 	}
@@ -264,4 +196,35 @@ func (s *Server) addChatroomMemberHandler(c *gin.Context) {
 	chat.Members = append(chat.Members, payload.MemberUid)
 
 	c.JSON(http.StatusOK, gin.H{"members": chat.Members})
+}
+
+func (s *Server) getChats(c *gin.Context) {
+	_, userJwt, ok := helpers.AuthHelper(c)
+
+	if !ok {
+		return
+	}
+
+	user, err := s.db.GetUser(userJwt.Uid)
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		return
+	}
+
+	chatData := []database.Chatroom{}
+
+	for _, val := range user.Chatrooms {
+		chatroom, err := s.db.GetChat(val, 0, 20)
+		if err != nil {
+			fmt.Println(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+			return
+		}
+		chatData = append(chatData, chatroom)
+
+	}
+
+	c.JSON(http.StatusOK, gin.H{"chats": chatData})
 }

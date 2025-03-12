@@ -16,12 +16,14 @@ import (
 type Service interface {
 	Health() map[string]string
 	AddUser(user User) (User, error)
-	GetUser(email string) (User, error)
+	GetUser(uid string) (User, error)
 	AddUserChatroom(uidUser, uidChatroom string) error
 	CreateChatroom(creatorUid, targetUid string) (Chatroom, error)
 	AddChatroomMember(uid, chatid string) error
 	SendMessage(chatId string, message Message) error
-	GetChat(chatId string) (Chatroom, error)
+	GetChat(chatId string, from, length int) (Chatroom, error)
+	GetUserByEmail(email string) (User, error)
+	GetUsers() ([]UserResponse, error)
 }
 
 type service struct {

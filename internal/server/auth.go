@@ -54,10 +54,9 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"jwt": authToken.CreateToken(user),
 		"user": gin.H{
-			"Username":  user.Username,
-			"uid":       user.Uid,
-			"email":     user.Email,
-			"chatrooms": user.Chatrooms,
+			"Username": user.Username,
+			"uid":      user.Uid,
+			"email":    user.Email,
 		},
 	})
 }
@@ -87,7 +86,7 @@ func (s *Server) loginHandler(c *gin.Context) {
 
 	user.Password = base64.URLEncoding.EncodeToString(password)
 
-	userDb, err := s.db.GetUser(user.Email)
+	userDb, err := s.db.GetUserByEmail(user.Email)
 
 	// checking if hashes match
 	if err == nil && user.Password != userDb.Password {
@@ -108,56 +107,41 @@ func (s *Server) loginHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"jwt": authToken.CreateToken(userDb),
 		"user": gin.H{
-			"Username":  userDb.Username,
-			"uid":       userDb.Uid,
-			"email":     userDb.Email,
-			"chatrooms": userDb.Chatrooms,
+			"Username": userDb.Username,
+			"uid":      userDb.Uid,
+			"email":    userDb.Email,
 		},
 	})
 }
 
-type getUserDataPayload struct {
-	Jwt string `json:"jwt"`
-}
-
 func (s *Server) getUserData(c *gin.Context) {
-	jwtStruct := getUserDataPayload{}
-	body, _ := c.GetRawData()
+	userId := c.Param("uid")
 
-	err := json.Unmarshal(body, &jwtStruct)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
-		return
-	}
-
-	if err = authToken.VerifyToken(jwtStruct.Jwt); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "token not valid"})
-		return
-	}
-
-	tokenData, err := authToken.GetUserData(jwtStruct.Jwt)
+	userData, err := s.db.GetUser(userId)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 		fmt.Println(err)
-		return
-	}
-
-	userData, err := s.db.GetUser(tokenData.Email)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
-		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"Username":  userData.Username,
-			"uid":       userData.Uid,
-			"email":     userData.Email,
-			"chatrooms": userData.Chatrooms,
+			"Username": userData.Username,
+			"uid":      userData.Uid,
+			"email":    userData.Email,
 		},
 	})
+}
+
+func (s *Server) getUsers(c *gin.Context) {
+	users, err := s.db.GetUsers()
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
 }

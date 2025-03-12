@@ -9,19 +9,29 @@ import (
 func (s *Server) RegisterRoutes() http.Handler {
 	r := gin.Default()
 
+	r.GET("/ws", s.connectToWS)
+
 	r.GET("/health", s.healthHandler)
 
 	r.POST("/auth/register", s.createUserHandler)
 
 	r.POST("/auth/login", s.loginHandler)
 
-	r.GET("/auth", s.getUserData)
+	// TODO add token invalidation
 
-	r.POST("/chat", s.createChatHandler)
+	// r.POST("/auth/logout")
 
-	r.PATCH("/chat", s.addChatroomMemberHandler)
+	r.GET("/users", s.getUsers)
 
-	r.GET("/chat/:chatId", s.connectToChatHandler)
+	r.GET("/users/:uid", s.getUserData)
+
+	r.GET("/chats", s.getChats)
+
+	r.POST("/chats", s.createChatHandler)
+
+	r.PATCH("/chats", s.addChatroomMemberHandler)
+
+	r.GET("/chats/:chatId", s.getChatHistory)
 
 	return r
 }

@@ -14,7 +14,7 @@ import (
 )
 
 // type of database.User that can be read using jwt token
-type jwtUser struct {
+type JwtUser struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 	Uid      string `json:"uid"`
@@ -69,21 +69,21 @@ func decodeBase64(encoded string) ([]byte, error) {
 	return decodedBytes, nil
 }
 
-func GetUserData(tokenString string) (jwtUser, error) {
+func GetUserData(tokenString string) (JwtUser, error) {
 	sect := strings.Split(tokenString, ".")
 
 	decodedBytes, err := decodeBase64(sect[1])
 
 	if err != nil {
-		return jwtUser{}, err
+		return JwtUser{}, err
 	}
 
-	userData := jwtUser{}
+	userData := JwtUser{}
 
 	err = json.Unmarshal(decodedBytes, &userData)
 
 	if err != nil {
-		return jwtUser{}, err
+		return JwtUser{}, err
 	}
 
 	return userData, nil
