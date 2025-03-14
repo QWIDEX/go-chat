@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"go-chat/internal/database"
 	"go-chat/internal/helpers"
@@ -70,11 +71,6 @@ func (s *Server) createChatHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"chatroomID": chatroom.ChatId})
 }
 
-type getChatHistoryPayload struct {
-	From   int `json:"from"`
-	Length int `json:"length"`
-}
-
 func (s *Server) getChatHistory(c *gin.Context) {
 	_, user, ok := helpers.AuthHelper(c)
 
@@ -84,17 +80,19 @@ func (s *Server) getChatHistory(c *gin.Context) {
 
 	chatId := c.Param("chatId")
 
-	payload := getChatHistoryPayload{}
-	body, _ := c.GetRawData()
-
-	err := json.Unmarshal(body, &payload)
+	from, err := strconv.Atoi(c.Query("from"))
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
-		return
+		from = 0
 	}
 
-	chatroom, err := s.db.GetChat(chatId, payload.From, payload.Length)
+	length, err := strconv.Atoi(c.Query("length"))
+
+	if err != nil {
+		length = 0
+	}
+
+	chatroom, err := s.db.GetChat(chatId, from, length)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})

@@ -9,14 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// user for sending in api
-type UserResponse struct {
-	Email     string   `json:"email"`
-	Username  string   `json:"username"`
-	Chatrooms []string `json:"chatrooms"`
-	Uid       string   `json:"uid"`
-}
-
 // user for getting data in req
 type User struct {
 	Email     string   `json:"email"`
@@ -130,6 +122,13 @@ func (s *service) GetUser(uid string) (User, error) {
 
 }
 
+// user for sending in api
+type UserResponse struct {
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Uid      string `json:"uid"`
+}
+
 func (s *service) GetUsers() ([]UserResponse, error) {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Users")
@@ -150,7 +149,7 @@ func (s *service) GetUsers() ([]UserResponse, error) {
 	users := []UserResponse{}
 
 	for _, val := range usersDb {
-		users = append(users, UserResponse{Username: val.Username, Email: val.Email, Chatrooms: val.Chatrooms, Uid: val.DbId.Hex()})
+		users = append(users, UserResponse{Username: val.Username, Email: val.Email, Uid: val.DbId.Hex()})
 	}
 
 	return users, nil

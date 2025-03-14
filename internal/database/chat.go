@@ -100,5 +100,7 @@ func (s *service) GetChat(chatId string, skip, length int) (Chatroom, error) {
 		return Chatroom{}, err
 	}
 
+	chatroom.ChatId = chatId
+
 	return chatroom, nil
 }

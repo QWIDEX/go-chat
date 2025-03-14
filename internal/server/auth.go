@@ -30,10 +30,16 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	}
 
 	// attempting to get user by this email
-	_, err = s.db.GetUser(user.Email)
+	user, err = s.db.GetUserByEmail(user.Email)
 
-	if !errors.Is(err, mongo.ErrNoDocuments) {
+	if user.Uid != "" {
 		c.JSON(http.StatusConflict, gin.H{"message": "user already exists"})
+		return
+	}
+
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 		return
 	}
 
@@ -213,6 +219,7 @@ func (s *Server) getUserData(c *gin.Context) {
 				"chatrooms": userData.Chatrooms,
 			},
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
