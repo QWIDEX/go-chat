@@ -21,6 +21,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 
 	// r.POST("/auth/logout")
 
+	r.GET("/auth/refresh-token", s.refreshToken)
+
 	r.GET("/users", s.getUsers)
 
 	r.GET("/users/:uid", s.getUserData)

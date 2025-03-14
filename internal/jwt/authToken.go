@@ -7,6 +7,7 @@ import (
 	"go-chat/internal/database"
 	"os"
 	"strings"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
 
@@ -20,7 +21,15 @@ type JwtUser struct {
 	Uid      string `json:"uid"`
 }
 
-func CreateToken(user database.User) string {
+func CreateAccessToken(user database.User) string {
+	return CreateToken(user, time.Now().Add(time.Duration(time.Minute*15)).Unix())
+}
+
+func CreateRefreshToken(user database.User) string {
+	return CreateToken(user, time.Now().AddDate(0, 1, 0).Unix())
+}
+
+func CreateToken(user database.User, expires int64) string {
 	authSecret := os.Getenv("authSecret")
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -29,7 +38,9 @@ func CreateToken(user database.User) string {
 		"username": user.Username,
 		"email":    user.Email,
 		"uid":      user.Uid,
+		"exp":      expires,
 	})
+
 	signedToken, _ := token.SignedString([]byte(authSecret))
 
 	jwt.WithValidMethods([]string{"HS256"})
@@ -46,6 +57,16 @@ func VerifyToken(tokenString string) error {
 
 	if err != nil {
 		return err
+	}
+
+	date, err := token.Claims.GetExpirationTime()
+
+	if err != nil {
+		return err
+	}
+
+	if date == nil || time.Now().Unix() > date.Unix() {
+		return fmt.Errorf("token expired")
 	}
 
 	if !token.Valid {

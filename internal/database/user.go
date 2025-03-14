@@ -40,6 +40,7 @@ func (u *user) toPublicUser() User {
 	user := User{}
 
 	user.Email = u.Email
+	user.Password = u.Password
 	user.Username = u.Username
 	user.Chatrooms = u.Chatrooms
 	user.Uid = u.DbId.Hex()

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"go-chat/internal/database"
 	authToken "go-chat/internal/jwt"
@@ -51,12 +53,23 @@ func (s *Server) createUserHandler(c *gin.Context) {
 		return
 	}
 
+	c.SetCookie(
+		"refreshToken",
+		authToken.CreateRefreshToken(user),
+		int(time.Until(time.Now().AddDate(0, 1, 0)).Seconds()),
+		"/",
+		"localhost",
+		true,
+		true,
+	)
+
 	c.JSON(http.StatusOK, gin.H{
-		"jwt": authToken.CreateToken(user),
+		"accessToken": authToken.CreateAccessToken(user),
 		"user": gin.H{
-			"Username": user.Username,
-			"uid":      user.Uid,
-			"email":    user.Email,
+			"Username":  user.Username,
+			"uid":       user.Uid,
+			"email":     user.Email,
+			"chatrooms": user.Chatrooms,
 		},
 	})
 }
@@ -104,17 +117,83 @@ func (s *Server) loginHandler(c *gin.Context) {
 		return
 	}
 
+	c.SetCookie(
+		"refreshToken",
+		authToken.CreateRefreshToken(userDb),
+		int(time.Until(time.Now().AddDate(0, 1, 0)).Seconds()),
+		"/",
+		"localhost",
+		true,
+		true,
+	)
+
 	c.JSON(http.StatusOK, gin.H{
-		"jwt": authToken.CreateToken(userDb),
+		"accessToken": authToken.CreateAccessToken(userDb),
 		"user": gin.H{
-			"Username": userDb.Username,
-			"uid":      userDb.Uid,
-			"email":    userDb.Email,
+			"Username":  userDb.Username,
+			"uid":       userDb.Uid,
+			"email":     userDb.Email,
+			"chatrooms": userDb.Chatrooms,
 		},
 	})
 }
 
+func (s *Server) refreshToken(c *gin.Context) {
+	cookie, err := c.Cookie("refreshToken")
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+		return
+	}
+
+	err = authToken.VerifyToken(cookie)
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+		return
+	}
+
+	userJwt, err := authToken.GetUserData(cookie)
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		return
+	}
+
+	user := database.User{Username: userJwt.Username, Email: userJwt.Email, Uid: userJwt.Uid}
+
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken": authToken.CreateAccessToken(user),
+	})
+
+}
+
 func (s *Server) getUserData(c *gin.Context) {
+	jwt := c.GetHeader("Authorization")
+	user := authToken.JwtUser{}
+
+	if len(jwt) != 0 {
+		jwt = strings.Split(jwt, " ")[1]
+
+		err := authToken.VerifyToken(jwt)
+
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+			return
+		}
+
+		user, err = authToken.GetUserData(jwt)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+			fmt.Println(err)
+			return
+		}
+	}
+
 	userId := c.Param("uid")
 
 	userData, err := s.db.GetUser(userId)
@@ -123,6 +202,17 @@ func (s *Server) getUserData(c *gin.Context) {
 		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
 		return
+	}
+
+	if userId == user.Uid {
+		c.JSON(http.StatusOK, gin.H{
+			"user": gin.H{
+				"Username":  userData.Username,
+				"uid":       userData.Uid,
+				"email":     userData.Email,
+				"chatrooms": userData.Chatrooms,
+			},
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{

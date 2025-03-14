@@ -24,6 +24,7 @@ func AuthHelper(c *gin.Context) (jwt string, user authToken.JwtUser, ok bool) {
 	err := authToken.VerifyToken(jwt)
 
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
 		return
 	}
@@ -31,8 +32,8 @@ func AuthHelper(c *gin.Context) (jwt string, user authToken.JwtUser, ok bool) {
 	user, err = authToken.GetUserData(jwt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
 		return
 	}
 
