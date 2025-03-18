@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"go-chat/internal/database"
@@ -14,12 +15,13 @@ import (
 
 // payload that is expected to create chat
 type createChatPayload struct {
+	ChatName  string `json:"chatName"`
 	TargetUid string `json:"targetUid"`
 }
 
-func (s *Server) createChat(creatorUid, targetUid string) (database.Chatroom, error) {
+func (s *Server) createChat(creatorUid, targetUid, chatName string) (database.Chatroom, error) {
 	// creating chatroom
-	chatroom, err := s.db.CreateChatroom(creatorUid, targetUid)
+	chatroom, err := s.db.CreateChatroom(creatorUid, targetUid, chatName)
 
 	if err != nil {
 		return database.Chatroom{}, err
@@ -60,7 +62,7 @@ func (s *Server) createChatHandler(c *gin.Context) {
 	}
 
 	// creating chatroom
-	chatroom, err := s.createChat(user.Uid, payload.TargetUid)
+	chatroom, err := s.createChat(user.Uid, payload.TargetUid, payload.ChatName)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
@@ -221,8 +223,15 @@ func (s *Server) getChats(c *gin.Context) {
 			return
 		}
 		chatData = append(chatData, chatroom)
-
 	}
+
+	sort.Sort(ByDate(chatData))
 
 	c.JSON(http.StatusOK, gin.H{"chats": chatData})
 }
+
+type ByDate []database.Chatroom
+
+func (a ByDate) Len() int           { return len(a) }
+func (a ByDate) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByDate) Less(i, j int) bool { return a[i].LastMessage.Time().After(a[j].LastMessage.Time()) }

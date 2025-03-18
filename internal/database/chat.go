@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -9,25 +10,30 @@ import (
 )
 
 type Message struct {
-	Sender  string `json:"sender"`
-	Message string `json:"message"`
+	Sender  string             `json:"sender"`
+	Message string             `json:"message"`
+	SentAt  primitive.DateTime `json:"sentAt" bson:"sentAt"`
 }
 
 type Chatroom struct {
-	Members []string
-	Chat    []Message
-	ChatId  string
+	ChatName    string             `json:"chatName"`
+	Members     []string           `json:"members"`
+	Chat        []Message          `json:"chat"`
+	ChatId      string             `json:"chatId"`
+	LastMessage primitive.DateTime `json:"lastMessage"`
 }
 
-func (s *service) CreateChatroom(creatorUid, targetUid string) (Chatroom, error) {
+func (s *service) CreateChatroom(creatorUid, targetUid, chatName string) (Chatroom, error) {
 	db := s.db.Database("ChatApp")
 	coll := db.Collection("Chats")
 
 	chatroom := Chatroom{}
 
 	res, err := coll.InsertOne(context.TODO(), map[string]any{
-		"members": []string{creatorUid, targetUid},
-		"chat":    []Message{},
+		"members":     []string{creatorUid, targetUid},
+		"chat":        []Message{},
+		"chatName":    chatName,
+		"lastMessage": primitive.NewDateTimeFromTime(time.Now()),
 	})
 
 	if err != nil {
@@ -59,7 +65,11 @@ func (s *service) SendMessage(chatId string, message Message) error {
 
 	id, _ := primitive.ObjectIDFromHex(chatId)
 
-	update := bson.D{{Key: "$push", Value: bson.D{{Key: "chat", Value: bson.D{{Key: "$each", Value: []Message{message}}, {Key: "$position", Value: 0}}}}}}
+	sentAt := primitive.NewDateTimeFromTime(time.Now())
+
+	message.SentAt = sentAt
+
+	update := bson.D{{Key: "$push", Value: bson.D{{Key: "chat", Value: bson.D{{Key: "$each", Value: []Message{message}}, {Key: "$position", Value: 0}}}}}, {Key: "$set", Value: bson.D{{Key: "lastMessage", Value: sentAt}}}}
 	_, err := coll.UpdateByID(context.TODO(), id, update)
 
 	return err

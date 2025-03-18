@@ -25,21 +25,21 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	err := json.Unmarshal(body, &user)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to read JSON payload"})
 		return
 	}
 
 	// attempting to get user by this email
-	user, err = s.db.GetUserByEmail(user.Email)
+	userDb, err := s.db.GetUserByEmail(user.Email)
 
-	if user.Uid != "" {
-		c.JSON(http.StatusConflict, gin.H{"message": "user already exists"})
+	if userDb.Uid != "" {
+		c.JSON(http.StatusConflict, gin.H{"message": "User already exists"})
 		return
 	}
 
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
 		return
 	}
 
@@ -54,7 +54,7 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	user, err = s.db.AddUser(user)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
 		fmt.Println(err)
 		return
 	}
@@ -72,10 +72,9 @@ func (s *Server) createUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": authToken.CreateAccessToken(user),
 		"user": gin.H{
-			"Username":  user.Username,
-			"uid":       user.Uid,
-			"email":     user.Email,
-			"chatrooms": user.Chatrooms,
+			"username": user.Username,
+			"uid":      user.Uid,
+			"email":    user.Email,
 		},
 	})
 }
@@ -94,7 +93,7 @@ func (s *Server) loginHandler(c *gin.Context) {
 	err := json.Unmarshal(body, &user)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to read JSON payload"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to read JSON payload"})
 		return
 	}
 
@@ -113,12 +112,12 @@ func (s *Server) loginHandler(c *gin.Context) {
 	}
 
 	if errors.Is(err, WrongPasswordErr{}) || errors.Is(err, mongo.ErrNoDocuments) {
-		c.JSON(http.StatusUnauthorized, gin.H{"message:": "Wrong email or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Wrong email or password"})
 		return
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
 		fmt.Println(err)
 		return
 	}
@@ -136,10 +135,9 @@ func (s *Server) loginHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"accessToken": authToken.CreateAccessToken(userDb),
 		"user": gin.H{
-			"Username":  userDb.Username,
-			"uid":       userDb.Uid,
-			"email":     userDb.Email,
-			"chatrooms": userDb.Chatrooms,
+			"username": userDb.Username,
+			"uid":      userDb.Uid,
+			"email":    userDb.Email,
 		},
 	})
 }
@@ -149,7 +147,7 @@ func (s *Server) refreshToken(c *gin.Context) {
 
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to authentificate"})
 		return
 	}
 
@@ -157,7 +155,7 @@ func (s *Server) refreshToken(c *gin.Context) {
 
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to authentificate"})
 		return
 	}
 
@@ -165,7 +163,7 @@ func (s *Server) refreshToken(c *gin.Context) {
 
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
 		return
 	}
 
@@ -179,7 +177,6 @@ func (s *Server) refreshToken(c *gin.Context) {
 
 func (s *Server) getUserData(c *gin.Context) {
 	jwt := c.GetHeader("Authorization")
-	user := authToken.JwtUser{}
 
 	if len(jwt) != 0 {
 		jwt = strings.Split(jwt, " ")[1]
@@ -187,15 +184,7 @@ func (s *Server) getUserData(c *gin.Context) {
 		err := authToken.VerifyToken(jwt)
 
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
-			return
-		}
-
-		user, err = authToken.GetUserData(jwt)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
-			fmt.Println(err)
+			c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to authentificate"})
 			return
 		}
 	}
@@ -206,19 +195,7 @@ func (s *Server) getUserData(c *gin.Context) {
 
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "something went wrong"})
-		return
-	}
-
-	if userId == user.Uid {
-		c.JSON(http.StatusOK, gin.H{
-			"user": gin.H{
-				"Username":  userData.Username,
-				"uid":       userData.Uid,
-				"email":     userData.Email,
-				"chatrooms": userData.Chatrooms,
-			},
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Something went wrong"})
 		return
 	}
 
@@ -236,7 +213,7 @@ func (s *Server) getUsers(c *gin.Context) {
 
 	if err != nil {
 		fmt.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "something went wrong"})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Something went wrong"})
 		return
 	}
 
