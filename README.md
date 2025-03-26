@@ -1,45 +1,104 @@
-# Project go-chat
+# go-chat
 
-Docker wasn't set up, so MongoDB is currently being hosted on Atlas.
+A simple chat application built with Go, Gin, and MongoDB.
 
-## MakeFile
+## Features
 
-run all make commands with clean tests
-```bash
-make all build
-```
+- User registration and authentication
+- Create and join chat rooms
+- Send and receive messages in real-time using WebSockets
+- MongoDB integration for storing user and chat data
 
-build the application
-```bash
-make build
-```
+## Prerequisites
 
-run the application
-```bash
-make run
-```
+- Go 1.23 or later
+- Docker (for running MongoDB)
+- Make
 
-Create DB container
-```bash
-make docker-run
-```
+## Setup
 
-Shutdown DB container
-```bash
-make docker-down
-```
+1. Clone the repository:
 
-live reload the application
-```bash
-make watch
-```
+    ```bash
+    git clone https://github.com/yourusername/go-chat.git
+    cd go-chat
+    ```
 
-run the test suite
-```bash
-make test
-```
+2. Copy the .env.default file to .env and update the environment variables as needed:
 
-clean up binary from the last build
-```bash
-make clean
-```
+    ```bash
+    cp .env.default .env
+    ```
+
+3. Install dependencies:
+
+    ```bash
+    go mod download
+    ```
+
+## Running the Application
+
+### Using Docker
+
+1. Build and run the Docker containers:
+
+    ```bash
+    make docker-run
+    ```
+
+2. Build and run the application:
+
+    ```bash
+    make build
+    make run
+    ```
+
+## Makefile Commands
+
+- Build the application:
+
+    ```bash
+    make build
+    ```
+
+- Run the application:
+
+    ```bash
+    make run
+    ```
+
+- Live reload the application:
+
+    ```bash
+    make watch
+    ```
+
+- Clean up binary from the last build:
+
+    ```bash
+    make clean
+    ```
+
+## API Endpoints
+
+### Authentication
+
+- `POST /auth/register` - Register a new user
+- `POST /auth/login` - Login a user
+- `GET /auth/refresh-token` - Refresh access token
+
+### Users
+
+- `GET /users` - Get all users
+- `GET /users/:uid` - Get user data by UID
+
+### Chats
+
+- `GET /chats` - Get all chat rooms for the authenticated user
+- `POST /chats` - Create a new chat room
+- `PATCH /chats` - Add a member to a chat room
+- `GET /chats/:chatId` - Get chat history by chat ID
+
+### WebSocket
+
+- `GET /ws` - Connect to WebSocket for real-time messaging
