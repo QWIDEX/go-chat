@@ -53,7 +53,9 @@ func (s *service) AddChatroomMember(uid, chatid string) error {
 
 	id, _ := primitive.ObjectIDFromHex(chatid)
 
-	update := bson.D{{Key: "$push", Value: bson.D{{Key: "members", Value: uid}}}}
+	sentAt := primitive.NewDateTimeFromTime(time.Now())
+
+	update := bson.D{{Key: "$push", Value: bson.D{{Key: "members", Value: uid}}}, {Key: "$set", Value: bson.D{{Key: "lastMessage", Value: sentAt}}}}
 	_, err := coll.UpdateByID(context.TODO(), id, update)
 
 	return err

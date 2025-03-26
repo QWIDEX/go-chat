@@ -14,7 +14,7 @@ func AuthHelper(c *gin.Context) (jwt string, user authToken.JwtUser, ok bool) {
 
 	jwt = c.GetHeader("Authorization")
 
-	if len(jwt) == 0 {
+	if len(strings.Split(jwt, " ")) <= 1 {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "failed to authentificate"})
 		return
 	}

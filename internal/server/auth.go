@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"go-chat/internal/database"
@@ -176,22 +175,9 @@ func (s *Server) refreshToken(c *gin.Context) {
 }
 
 func (s *Server) getUserData(c *gin.Context) {
-	jwt := c.GetHeader("Authorization")
+	uid := c.Param("uid")
 
-	if len(jwt) != 0 {
-		jwt = strings.Split(jwt, " ")[1]
-
-		err := authToken.VerifyToken(jwt)
-
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to authentificate"})
-			return
-		}
-	}
-
-	userId := c.Param("uid")
-
-	userData, err := s.db.GetUser(userId)
+	userData, err := s.db.GetUser(uid)
 
 	if err != nil {
 		fmt.Println(err)
@@ -201,7 +187,7 @@ func (s *Server) getUserData(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"Username": userData.Username,
+			"username": userData.Username,
 			"uid":      userData.Uid,
 			"email":    userData.Email,
 		},

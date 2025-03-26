@@ -7,16 +7,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// func delayMiddleware() gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		time.Sleep(1 * time.Second)
+// 		c.Next()
+// 	}
+// }
+
 func (s *Server) RegisterRoutes() http.Handler {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+
+	// r.Use(delayMiddleware())
 
 	r.GET("/ws", s.connectToWS)
 

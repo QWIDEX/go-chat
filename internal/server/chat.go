@@ -70,7 +70,7 @@ func (s *Server) createChatHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"chatroomID": chatroom.ChatId})
+	c.JSON(http.StatusOK, gin.H{"chatId": chatroom.ChatId})
 }
 
 func (s *Server) getChatHistory(c *gin.Context) {
